@@ -20,8 +20,7 @@ import { Client } from 'elasticsearch';
 import { get } from 'lodash';
 
 import { LegacyElasticsearchErrorHelpers } from './errors';
-import { GetAuthHeaders, isRealRequest, KibanaRequest } from '../../http';
-import { AuditorFactory } from '../../audit_trail';
+import { GetAuthHeaders, isRealRequest } from '../../http';
 import { filterHeaders, ensureRawRequest } from '../../http/router';
 import { Logger } from '../../logging';
 import { ScopeableRequest } from '../types';
@@ -132,7 +131,6 @@ export class LegacyClusterClient implements ILegacyClusterClient {
   constructor(
     private readonly config: LegacyElasticsearchClientConfig,
     private readonly log: Logger,
-    private readonly getAuditorFactory: () => AuditorFactory,
     private readonly getAuthHeaders: GetAuthHeaders = noop
   ) {
     this.client = new Client(parseElasticsearchClientConfig(config, log));
@@ -207,19 +205,8 @@ export class LegacyClusterClient implements ILegacyClusterClient {
     return new LegacyScopedClusterClient(
       this.callAsInternalUser,
       this.callAsCurrentUser,
-      filterHeaders(this.getHeaders(request), this.config.requestHeadersWhitelist),
-      this.getScopedAuditor(request)
+      filterHeaders(this.getHeaders(request), this.config.requestHeadersWhitelist)
     );
-  }
-
-  private getScopedAuditor(request?: ScopeableRequest) {
-    // TODO: support alternative credential owners from outside of Request context in #39430
-    if (request && isRealRequest(request)) {
-      const kibanaRequest =
-        request instanceof KibanaRequest ? request : KibanaRequest.from(request);
-      const auditorFactory = this.getAuditorFactory();
-      return auditorFactory.asScoped(kibanaRequest);
-    }
   }
 
   /**
